@@ -20,20 +20,23 @@
 
 /*
    Touch example for STM32F476 Discvery
-
    using Adafruit compatible API
-
    June 2017, ChrisMicro
 */
+#ifndef BASE_LVGL
+  #include "LTDC_F746_Discovery.h" // TFT
+  #include "TouchScreen_F7_Discovery.h" // TOUCH
 
-#include "LTDC_F746_Discovery.h" // TFT
-#include "TouchScreen_F7_Discovery.h" // TOUCH
-
-LTDC_F746_Discovery tft;
-TouchScreen         ts;
+  LTDC_F746_Discovery tft;
+  TouchScreen         ts;
+#else
+  #include <lvgl.h>
+  #include <lv_demos.h>
+#endif
 
 void setup()
 {
+#ifndef BASE_LVGL
   // The buffer is memory mapped
   // You can directly draw on the display by writing to the buffer
   uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
@@ -50,27 +53,38 @@ void setup()
 #define CURSOR_SIZE 100
 
 TSPoint OldPoint;
+#else
+
+}
+#endif
 
 void loop()
 {
-    TSPoint p = ts.getPoint();
+#ifndef BASE_LVGL
 
-    if( OldPoint != p )
+  TSPoint p = ts.getPoint();
+
+  if( OldPoint != p )
+  {
+    OldPoint=p;
+
+    tft.fillScreen( LTDC_BLACK );
+
+    tft.setCursor(0, 0);
+
+    tft.print(p.x); tft.print(" , "); tft.print(p.y);
+    tft.print(" pressure: "); tft.println( p.z );
+
+    if ( p.z )
     {
-      OldPoint=p;
-
-      tft.fillScreen( LTDC_BLACK );
-
-      tft.setCursor(0, 0);
-
-      tft.print(p.x); tft.print(" , "); tft.print(p.y);
-      tft.print(" pressure: "); tft.println( p.z );
-
-      if ( p.z )
-      {
-        tft.fillRect(p.x - CURSOR_SIZE/2, p.y - CURSOR_SIZE/2, CURSOR_SIZE, CURSOR_SIZE, LTDC_GREEN);
-      }
-
-      delay(10);
+      tft.fillRect(p.x - CURSOR_SIZE/2, p.y - CURSOR_SIZE/2, CURSOR_SIZE, CURSOR_SIZE, LTDC_GREEN);
     }
+
+    delay(10);
+  }
 }
+#else
+
+}
+#endif
+
