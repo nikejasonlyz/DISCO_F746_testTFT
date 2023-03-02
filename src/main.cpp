@@ -1,18 +1,18 @@
 /************************************************************************
-
   STM32F746 Discovery TFT example template
-
   Required libraries: GFX, Adafruit
-
   Installation Instructions:
   1. Import the Adadruit library in the menue
   Sketch=>Include Libraries=>Manage Libraries =>  Adafruit ILI9341
   2. Import the Adadruit GFX-Library
   Sketch=>Include Libraries=>Manage Libraries =>  Adafruit GFX Library
-
   June 2017, ChrisMicro
-
 ************************************************************************/
+/* 
+ * Using Adafruit GFX-Library and LVGL
+ *
+ * March 2023, Nikejasonlyz
+ */
 // #include "stm32f746xx.h" // Provide specific declarations for LTDC, TFT, etc
 #include <Arduino.h>
 #include <yjTask.hpp>
