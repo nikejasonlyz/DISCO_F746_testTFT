@@ -142,13 +142,13 @@ void LTDCClass<W, H>::begin(uint16_t *buffer) {
     /* LCD_MspInit and LCD_ClockConfig */
     /* Configure LCD pins, and peripheral clocks. */
     __HAL_RCC_LTDC_CLK_ENABLE();
-    // __HAL_RCC_DMA2D_CLK_ENABLE();    /* TODO:DMA部分暂时搁置 */
+    __HAL_RCC_DMA2D_CLK_ENABLE();    /* TODO:DMA部分没有特殊处理。故开启与否似乎无影响 */
     init(); /* 以及显示，背光使能 */
 
     HAL_LTDC_Init(&hLtdcHandler);
 
-    // BSP_SDRAM_Init(); /* TODO:这个似乎没有体现 */
-    // HAL_EnableFMCMemorySwapping(); /* 不知道有何影响 */
+    // BSP_SDRAM_Init(); /* TODO:SDRAM配置似乎没有体现 */
+    HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，目前未发现差异 */
 
     /* LCD_LayerRgb565Init */
     LTDC_LayerCfgTypeDef  layer_cfg;
