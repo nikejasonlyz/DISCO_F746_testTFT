@@ -74,7 +74,7 @@ class LTDCClass : public Adafruit_GFX {
         };
         virtual void init() = 0;
 
-        void begin(uint32_t *buffer);
+        void begin(uint16_t *buffer);
 
         void drawPixel(int16_t x, int16_t y, uint16_t color);
 
@@ -95,7 +95,7 @@ class LTDCClass : public Adafruit_GFX {
             return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
         }
 
-        uint32_t *buffer = NULL;
+        uint16_t *buffer = NULL;
         LTDCSettings settings;
         LTDC_HandleTypeDef  hLtdcHandler;
 
@@ -108,7 +108,7 @@ class LTDCClass : public Adafruit_GFX {
 *LCD_MspInit，LCD_ClockConfig（对应init()）
 *---------------------------------------------*/
 template <int W, int H>
-void LTDCClass<W, H>::begin(uint32_t *buffer) {
+void LTDCClass<W, H>::begin(uint16_t *buffer) {
     this->buffer = buffer;
 
     /* LCD_Init */
@@ -142,13 +142,13 @@ void LTDCClass<W, H>::begin(uint32_t *buffer) {
     /* LCD_MspInit and LCD_ClockConfig */
     /* Configure LCD pins, and peripheral clocks. */
     __HAL_RCC_LTDC_CLK_ENABLE();
-    __HAL_RCC_DMA2D_CLK_ENABLE();    /* TODO:DMA部分暂时搁置 */
+    // __HAL_RCC_DMA2D_CLK_ENABLE();    /* TODO:DMA部分暂时搁置 */
     init(); /* 以及显示，背光使能 */
 
     HAL_LTDC_Init(&hLtdcHandler);
 
     // BSP_SDRAM_Init(); /* TODO:这个似乎没有体现 */
-    HAL_EnableFMCMemorySwapping(); /* 不知道有何影响 */
+    // HAL_EnableFMCMemorySwapping(); /* 不知道有何影响 */
 
     /* LCD_LayerRgb565Init */
     LTDC_LayerCfgTypeDef  layer_cfg;
