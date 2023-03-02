@@ -43,7 +43,7 @@ void setup()
   
   tft.begin((uint16_t *)buffer);
 
-  tft.fillScreen(LTDC_BLACK);
+  tft.fillScreen(LTDC_BLUE);
   //tft.setRotation(0);
   tft.setCursor(0, 0);
   tft.setTextColor(LTDC_BLUE);  tft.setTextSize(3);
