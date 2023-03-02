@@ -157,14 +157,14 @@ void LTDCClass<W, H>::begin(uint16_t *buffer) {
     }
     HAL_LTDC_Init(&hLtdcHandler);
 
-    LCD_DisplayOn();
+    // LCD_DisplayOn();
 
-    // /* Assert display enable LCD_DISP pin */
-    // pinMode(PI12, OUTPUT);
-    // digitalWrite(PI12, HIGH);
-    // /* Assert backlight LCD_BL_CTRL pin */
-    // pinMode(PK3, OUTPUT);
-    // digitalWrite(PK3, HIGH);
+    /* Assert display enable LCD_DISP pin */
+    pinMode(PI12, OUTPUT);
+    digitalWrite(PI12, HIGH);
+    /* Assert backlight LCD_BL_CTRL pin */
+    pinMode(PK3, OUTPUT);
+    digitalWrite(PK3, HIGH);
 
     // BSP_SDRAM_Init(); /* TODO:SDRAM配置似乎没有体现 */
     HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，目前未发现差异 */

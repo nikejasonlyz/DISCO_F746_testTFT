@@ -37,7 +37,6 @@ static const uint16_t LV_VER_RES_MAX = 272;
 
 /* LVGL */
 #include <lvgl.h>
-#include <demos/lv_demos.h>
 static lv_disp_draw_buf_t draw_buf;   // Draw buffer of lv_demo
 static lv_color_t buf1_1[LV_HOR_RES_MAX * 68];
 static lv_color_t buf1_2[LV_HOR_RES_MAX * 68];
