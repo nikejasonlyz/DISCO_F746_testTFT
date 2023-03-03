@@ -50,6 +50,26 @@ constexpr LTDCSettings LTDC_F746_ROKOTECH = {
  *        END
  *********************/
 
+/* Test */
+#define DMAtest 0
+#if DMAtest == 1
+#include "lvgl.h"
+static lv_disp_drv_t disp_drv;
+static uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
+
+static DMA_HandleTypeDef  DmaHandle;
+static int32_t            x1_flush;
+static int32_t            y1_flush;
+static int32_t            x2_flush;
+static int32_t            y2_fill;
+static int32_t            y_fill_act;
+static const lv_color_t * buf_to_flush;
+
+// static lv_disp_t *our_disp = NULL;
+
+// static LTDC_F746_Discovery tft;  /* TFT instance */
+#endif
+
 class LTDC_F746_Discovery : public LTDCClass<480, 272> {
 public:
     LTDC_F746_Discovery(): LTDCClass(LTDC_F746_ROKOTECH) {
@@ -146,6 +166,16 @@ public:
         pinMode(PK3, OUTPUT);
         digitalWrite(PK3, HIGH);
     }
+    /* TODO:seems need to optimize */
+    void LCD_DisplayOff() {
+        /* Display Off */
+        /* Assert LCD_DISP pin */
+        pinMode(PI12, OUTPUT);
+        digitalWrite(PI12, LOW);
+        /* Assert LCD_BL_CTRL pin */
+        pinMode(PK3, OUTPUT);
+        digitalWrite(PK3, LOW);
+    }
 
     // void DMA_Config() {
     //     /*## -1- Enable DMA2 clock #################################################*/
@@ -177,8 +207,8 @@ public:
     //     }
 
     //     /*##-5- Select Callbacks functions called after Transfer complete and Transfer error */
-    //     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_CPLT_CB_ID, DMA_TransferComplete);
-    //     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_ERROR_CB_ID, DMA_TransferError);
+    //     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_CPLT_CB_ID, LTDC_F746_Discovery::DMA_TransferComplete);
+    //     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_ERROR_CB_ID, LTDC_F746_Discovery::DMA_TransferError);
 
     //     /*##-6- Configure NVIC for DMA transfer complete/error interrupts ##########*/
     //     HAL_NVIC_SetPriority(CPY_BUF_DMA_STREAM_IRQ, 0, 0);
@@ -208,7 +238,7 @@ public:
     // #if LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
     //         length *= 2; /* STM32 DMA uses 16-bit chunks so multiply by 2 for 32-bit color */
     // #endif
-    //         if(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&my_fb[y_fill_act * LV_HOR_RES_MAX + x1_flush],
+    //         if(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * 480 + x1_flush],
     //                             length) != HAL_OK)
     //         {
     //             while(1);	/*Halt on error*/
@@ -234,6 +264,7 @@ public:
     //  */
     // void CPY_BUF_DMA_STREAM_IRQHANDLER()
     // {
+    //     // static DMA_HandleTypeDef  DmaHandle; /* TODO:测试DMA */
     //     /* Check the interrupt and clear flag */
     //     HAL_DMA_IRQHandler(&DmaHandle);
     // }

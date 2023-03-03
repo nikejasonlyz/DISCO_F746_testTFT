@@ -2,7 +2,7 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-03 01:51:38
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-03 03:16:25
+ * @LastEditTime: 2023-03-04 04:00:15
  * @FilePath: \DISCO_F746_testTFT\lib\LTDC\src\LTDC_TFT.cpp
  * @Description: Interfaces for LVGL support
  * @

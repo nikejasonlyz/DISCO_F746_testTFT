@@ -75,8 +75,12 @@ class LTDCClass : public Adafruit_GFX {
         virtual void LCD_ClockConfig() = 0;
         virtual void LCD_MspInit() = 0;
         virtual void LCD_DisplayOn() = 0;
+        virtual void LCD_DisplayOff() = 0;
         /* TODO:DMA_Config目前尚不明确，不声明调用亦正常 */
         // virtual void DMA_Config() = 0;
+        // virtual void DMA_TransferComplete(DMA_HandleTypeDef *han);
+        // virtual void DMA_TransferError(DMA_HandleTypeDef *han);
+        // virtual void CPY_BUF_DMA_STREAM_IRQHANDLER();
 
         void begin(uint16_t *buffer);
 

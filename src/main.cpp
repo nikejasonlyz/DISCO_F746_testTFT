@@ -35,8 +35,8 @@ typedef uint16_t uintpixel_t;
 #elif LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
 typedef uint32_t uintpixel_t;
 #endif
-// uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
-static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
+uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
+// static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
 
 /* 参考作用 */
 /*Change to your screen resolution*/
@@ -49,10 +49,6 @@ static const uint16_t LV_VER_RES_MAX = 272;
 static lv_disp_draw_buf_t draw_buf;   // Draw buffer of lv_demo
 static lv_color_t buf1_1[LV_HOR_RES_MAX * 68];
 static lv_color_t buf1_2[LV_HOR_RES_MAX * 68];
-
-/* TFT_eSPI */
-// #include <TFT_eSPI.h>
-// TFT_eSPI tft = TFT_eSPI(LV_HOR_RES_MAX, LV_VER_RES_MAX); /* TFT instance */
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -73,6 +69,7 @@ void pig_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *col
       for(x = area->x1; x <= area->x2; x++) {
           /*Put a pixel to the display. For example:*/
           /*put_px(x, y, *color_p)*/
+          // tft.drawPixel(x, y, (uint16_t)(*color_p));
           color_p++;
       }
   }
@@ -124,7 +121,7 @@ void setup()
   // You can directly draw on the display by writing to the buffer
   
   tft.begin((uint16_t *)buffer);
-  tft.setRotation( 3 ); /* Landscape orientation, flipped */
+  // tft.setRotation( 3 ); /* Landscape orientation, flipped */
   // tft.fillScreen(LTDC_BLACK);
 
   /*Set the touchscreen calibration data,
@@ -181,8 +178,28 @@ void setup()
 // #define CURSOR_SIZE 100
 // TSPoint OldPoint;
 
+String comdata="";
+void ReceiveSerialMessage() {
+  comdata="";
+  while (Serial.available() > 0 )
+  {
+    comdata+=char(Serial.read());
+    delay(2);
+  }
+}
 void loop()
 {
+  ReceiveSerialMessage();
+  if (comdata.length() > 0) {
+    Serial.println(comdata);
+    if (comdata.compareTo("on")>0) {
+      Serial.println("LCD on!");
+      tft.LCD_DisplayOn();
+    } else if (comdata.compareTo("off")>0) {
+      Serial.println("LCD off!");
+      tft.LCD_DisplayOff();
+    }
+  }
   // TSPoint p = ts.getPoint();
 
   // if( OldPoint != p )
