@@ -27,6 +27,7 @@
 
 /* 结合LVGL和stm32dunio示例进行适当修改 */
 #include "../../lv_conf.h"
+#include "stm32_ub_sdram.h"
 
 #ifndef LTDC_H
 #define LTDC_H
@@ -171,7 +172,10 @@ void LTDCClass<W, H>::begin(uint16_t *buffer) {
     // pinMode(PK3, OUTPUT);
     // digitalWrite(PK3, HIGH);
 
-    // BSP_SDRAM_Init(); /* TODO:SDRAM配置似乎没有体现 */
+    /* TODO:SDRAM配置似乎没有体现 */
+    // BSP_SDRAM_Init();
+    UB_SDRAM_Init();
+
     HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，目前未发现差异 */
 
     // FIXME: 这段来自tft.c的代码一旦放入疑似看门狗锁死

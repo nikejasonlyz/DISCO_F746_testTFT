@@ -2,7 +2,7 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-03 01:51:38
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-04 04:00:15
+ * @LastEditTime: 2023-03-04 04:10:32
  * @FilePath: \DISCO_F746_testTFT\lib\LTDC\src\LTDC_TFT.cpp
  * @Description: Interfaces for LVGL support
  * @
@@ -119,6 +119,13 @@ void tft_init(void)
 	our_disp = lv_disp_drv_register(&disp_drv);
 }
 
+/* TODO:定义屏幕开关 */
+void tft_on(void) {
+    tft.LCD_DisplayOn();
+}
+void tft_off(void) {
+    tft.LCD_DisplayOff();
+}
 
 /**********************
  *   STATIC FUNCTIONS

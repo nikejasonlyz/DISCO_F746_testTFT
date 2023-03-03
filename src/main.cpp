@@ -16,11 +16,7 @@
 // #include "stm32f746xx.h" // Provide specific declarations for LTDC, TFT, etc
 #include <Arduino.h>
 #include <yjTask.hpp>
-/*
-   Touch example for STM32F476 Discvery
-   using Adafruit compatible API
-   June 2017, ChrisMicro
-*/
+
 #include "LTDC_F746_Discovery.h" // TFT
 #include "TouchScreen_F7_Discovery.h" // TOUCH
 
@@ -29,6 +25,7 @@ TaskLed tBlink1(LED_BUILTIN,350);//设引脚LED,num为LED灯的闪烁周期
 /* inherented from Adafruit */
 LTDC_F746_Discovery tft;  /* TFT instance */
 TouchScreen         ts;   /* TouchScreen instance */
+
 
 #if LV_COLOR_DEPTH == 16
 typedef uint16_t uintpixel_t;

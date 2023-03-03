@@ -35,6 +35,8 @@
  * GLOBAL PROTOTYPES
  **********************/
 void tft_init(void);
+void tft_on(void);
+void tft_off(void);
 
 /**********************
  *      MACROS
