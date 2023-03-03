@@ -124,7 +124,7 @@ void setup()
   // You can directly draw on the display by writing to the buffer
   
   tft.begin((uint16_t *)buffer);
-  // tft.setRotation( 3 ); /* Landscape orientation, flipped */
+  tft.setRotation( 3 ); /* Landscape orientation, flipped */
   // tft.fillScreen(LTDC_BLACK);
 
   /*Set the touchscreen calibration data,

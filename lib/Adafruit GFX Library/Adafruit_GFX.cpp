@@ -1196,21 +1196,21 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 
     // Todo: Add character clipping here
 
-    // NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
-    // THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
-    // has typically been used with the 'classic' font to overwrite old
-    // screen contents with new data.  This ONLY works because the
-    // characters are a uniform size; it's not a sensible thing to do with
-    // proportionally-spaced fonts with glyphs of varying sizes (and that
-    // may overlap).  To replace previously-drawn text when using a custom
-    // font, use the getTextBounds() function to determine the smallest
-    // rectangle encompassing a string, erase the area with fillRect(),
-    // then draw new text.  This WILL infortunately 'blink' the text, but
-    // is unavoidable.  Drawing 'background' pixels will NOT fix this,
-    // only creates a new set of problems.  Have an idea to work around
-    // this (a canvas object type for MCUs that can afford the RAM and
-    // displays supporting setAddrWindow() and pushColors()), but haven't
-    // implemented this yet.
+/*     NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
+    THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
+    has typically been used with the 'classic' font to overwrite old
+    screen contents with new data.  This ONLY works because the
+    characters are a uniform size; it's not a sensible thing to do with
+    proportionally-spaced fonts with glyphs of varying sizes (and that
+    may overlap).  To replace previously-drawn text when using a custom
+    font, use the getTextBounds() function to determine the smallest
+    rectangle encompassing a string, erase the area with fillRect(),
+    then draw new text.  This WILL infortunately 'blink' the text, but
+    is unavoidable.  Drawing 'background' pixels will NOT fix this,
+    only creates a new set of problems.  Have an idea to work around
+    this (a canvas object type for MCUs that can afford the RAM and
+    displays supporting setAddrWindow() and pushColors()), but haven't
+    implemented this yet. */
 
     startWrite();
     for (yy = 0; yy < h; yy++) {
