@@ -30,6 +30,14 @@ TaskLed tBlink1(LED_BUILTIN,350);//设引脚LED,num为LED灯的闪烁周期
 LTDC_F746_Discovery tft;  /* TFT instance */
 TouchScreen         ts;   /* TouchScreen instance */
 
+#if LV_COLOR_DEPTH == 16
+typedef uint16_t uintpixel_t;
+#elif LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
+typedef uint32_t uintpixel_t;
+#endif
+// uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
+static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
+
 /* 参考作用 */
 /*Change to your screen resolution*/
 static const uint16_t LV_HOR_RES_MAX  = 480;
@@ -114,7 +122,6 @@ void setup()
 
   // The buffer is memory mapped
   // You can directly draw on the display by writing to the buffer
-  uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
   
   tft.begin((uint16_t *)buffer);
   // tft.setRotation( 3 ); /* Landscape orientation, flipped */
@@ -126,7 +133,7 @@ void setup()
   // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
   // tft.setTouch( calData );
 
-  lv_disp_draw_buf_init( &draw_buf, buf1_1, buf1_2, LV_HOR_RES_MAX * 68 );
+  lv_disp_draw_buf_init( &draw_buf, buf1_1, NULL, LV_HOR_RES_MAX * 68 );
 
   /*Initialize the display*/
   static lv_disp_drv_t disp_drv;
