@@ -2,27 +2,103 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-03 01:51:38
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-04 04:10:32
+ * @LastEditTime: 2023-03-04 06:00:47
  * @FilePath: \DISCO_F746_testTFT\lib\LTDC\src\LTDC_TFT.cpp
  * @Description: Interfaces for LVGL support
  * @
  * @Copyright (c) 2023 by nikejasonlyz, All Rights Reserved. 
  */
 
-#include "lvgl.h"
+/*********************
+ *      INCLUDES
+ *********************/
+#include "Arduino.h"
 #include "LTDC_TFT.h"
-#include "LTDC_F746_Discovery.h"
+#include "stm32_ub_sdram.h"
+#include "lv_conf.h"
+#include "lvgl.h"
 
-// static void LCD_DisplayOn(void) {
-//     /* Display On */
-//     /* Assert LCD_DISP pin */
-//     __HAL_LTDC_ENABLE(&hLtdcHandler);
-//     pinMode(PI12, OUTPUT);
-//     digitalWrite(PI12, HIGH);
-//     /* Assert LCD_BL_CTRL pin */
-//     pinMode(PK3, OUTPUT);
-//     digitalWrite(PK3, HIGH);
-// }
+/*********************
+ *      DEFINES
+ *********************/
+
+#if LV_COLOR_DEPTH != 16 && LV_COLOR_DEPTH != 24 && LV_COLOR_DEPTH != 32
+#error LV_COLOR_DEPTH must be 16, 24, or 32
+#endif
+
+/**
+  * @brief  LCD status structure definition
+  */
+#define LCD_OK                          ((uint8_t)0x00)
+#define LCD_ERROR                       ((uint8_t)0x01)
+#define LCD_TIMEOUT                     ((uint8_t)0x02)
+
+/**
+  * @brief LCD special pins
+  */
+/* Display enable pin */
+#define LCD_DISP_PIN                    GPIO_PIN_12
+#define LCD_DISP_GPIO_PORT              GPIOI
+#define LCD_DISP_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOI_CLK_ENABLE()
+#define LCD_DISP_GPIO_CLK_DISABLE()     __HAL_RCC_GPIOI_CLK_DISABLE()
+/* Backlight control pin */
+#define LCD_BL_CTRL_PIN                 GPIO_PIN_3
+#define LCD_BL_CTRL_GPIO_PORT           GPIOK
+#define LCD_BL_CTRL_GPIO_CLK_ENABLE()   __HAL_RCC_GPIOK_CLK_ENABLE()
+#define LCD_BL_CTRL_GPIO_CLK_DISABLE()  __HAL_RCC_GPIOK_CLK_DISABLE()
+
+#define CPY_BUF_DMA_STREAM              DMA2_Stream0
+#define CPY_BUF_DMA_CHANNEL             DMA_CHANNEL_0
+#define CPY_BUF_DMA_STREAM_IRQ          DMA2_Stream0_IRQn
+#define CPY_BUF_DMA_STREAM_IRQHANDLER   DMA2_Stream0_IRQHandler
+
+/* COLOR FROM Adafruit GFX */
+#define LTDC_BLACK       0x0000      /*   0,   0,   0 */
+#define LTDC_NAVY        0x000F      /*   0,   0, 128 */
+#define LTDC_DARKGREEN   0x03E0      /*   0, 128,   0 */
+#define LTDC_DARKCYAN    0x03EF      /*   0, 128, 128 */
+#define LTDC_MAROON      0x7800      /* 128,   0,   0 */
+#define LTDC_PURPLE      0x780F      /* 128,   0, 128 */
+#define LTDC_OLIVE       0x7BE0      /* 128, 128,   0 */
+#define LTDC_LIGHTGREY   0xC618      /* 192, 192, 192 */
+#define LTDC_DARKGREY    0x7BEF      /* 128, 128, 128 */
+#define LTDC_BLUE        0x001F      /*   0,   0, 255 */
+#define LTDC_GREEN       0x07E0      /*   0, 255,   0 */
+#define LTDC_CYAN        0x07FF      /*   0, 255, 255 */
+#define LTDC_RED         0xF800      /* 255,   0,   0 */
+#define LTDC_MAGENTA     0xF81F      /* 255,   0, 255 */
+#define LTDC_YELLOW      0xFFE0      /* 255, 255,   0 */
+#define LTDC_WHITE       0xFFFF      /* 255, 255, 255 */
+#define LTDC_ORANGE      0xFD20      /* 255, 165,   0 */
+#define LTDC_GREENYELLOW 0xAFE5      /* 173, 255,  47 */
+#define LTDC_PINK        0xF81F
+
+/**********************
+ *      TYPEDEFS
+ **********************/
+struct LTDCSettings {
+    uint16_t width;
+    uint16_t height;
+    uint16_t horizontalSync;
+    uint16_t horizontalFrontPorch;
+    uint16_t horizontalBackPorch;
+    uint16_t verticalSync;
+    uint16_t verticalFrontPorch;
+    uint16_t verticalBackPorch;
+};
+
+// The display on STM32F746NG Discovery
+constexpr LTDCSettings LTDC_F746_ROKOTECH = {
+    .width = 480,
+    .height = 272,
+    .horizontalSync = 41,
+    .horizontalFrontPorch = 32,
+    .horizontalBackPorch = 13,
+    .verticalSync = 10,
+    .verticalFrontPorch = 2,
+    .verticalBackPorch = 10,
+};
+
 /**********************
  *  STATIC PROTOTYPES
  **********************/
@@ -42,7 +118,7 @@ static void DMA_TransferError(DMA_HandleTypeDef *han);
 /**********************
  *  STATIC VARIABLES
  **********************/
-// static LTDC_HandleTypeDef  hLtdcHandler;
+static LTDC_HandleTypeDef  hLtdcHandler;
 static lv_disp_drv_t disp_drv;
 
 #if LV_COLOR_DEPTH == 16
@@ -51,7 +127,14 @@ typedef uint16_t uintpixel_t;
 typedef uint32_t uintpixel_t;
 #endif
 
-static uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
+/* You can try to change buffer to internal ram by uncommenting line below and commenting
+ * SDRAM one. */
+//static uintpixel_t buffer[TFT_HOR_RES * TFT_VER_RES];
+
+static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
+
+/* old one by malloc() */
+// static uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
 
 static DMA_HandleTypeDef  DmaHandle;
 static int32_t            x1_flush;
@@ -62,8 +145,6 @@ static int32_t            y_fill_act;
 static const lv_color_t * buf_to_flush;
 
 static lv_disp_t *our_disp = NULL;
-
-static LTDC_F746_Discovery tft;  /* TFT instance */
 
 /**********************
  *      MACROS
@@ -78,10 +159,11 @@ void tft_init(void)
 	if(our_disp != NULL)
 		abort();
     /* LCD Initialization */
-    tft.begin((uint16_t *)buffer);
+    LCD_Init();
+    LCD_LayerRgb565Init((uint32_t)buffer);
 
     /* Enable the LCD */
-    tft.LCD_DisplayOn();
+    LCD_DisplayOn();
 
     DMA_Config();
 
@@ -95,6 +177,7 @@ void tft_init(void)
 	static lv_color_t buf1_2[LV_HOR_RES_MAX * 68];
 	lv_disp_draw_buf_init(&disp_buf_1, buf1_1, buf1_2, LV_HOR_RES_MAX * 68);   /*Initialize the display buffer*/
 
+
 	/*-----------------------------------
 	* Register the display in LittlevGL
 	*----------------------------------*/
@@ -104,8 +187,8 @@ void tft_init(void)
 	/*Set up the functions to access to your display*/
 
 	/*Set the resolution of the display*/
-	disp_drv.hor_res = 480;
-	disp_drv.ver_res = 272;
+	disp_drv.hor_res = LTDC_F746_ROKOTECH.width;
+	disp_drv.ver_res = LTDC_F746_ROKOTECH.height;
 
 	/*Used to copy the buffer's content to the display*/
 	disp_drv.flush_cb = ex_disp_flush;
@@ -117,14 +200,6 @@ void tft_init(void)
 
 	/*Finally register the driver*/
 	our_disp = lv_disp_drv_register(&disp_drv);
-}
-
-/* TODO:定义屏幕开关 */
-void tft_on(void) {
-    tft.LCD_DisplayOn();
-}
-void tft_off(void) {
-    tft.LCD_DisplayOff();
 }
 
 /**********************
@@ -184,7 +259,214 @@ static void ex_disp_clean_dcache(lv_disp_drv_t *drv)
     SCB_CleanInvalidateDCache();
 }
 
+/**
+ * @brief Configure LCD pins, and peripheral clocks.
+ */
+static void LCD_MspInit(void) {
+    GPIO_InitTypeDef gpio_init_structure;
 
+    /* Enable the LTDC and DMA2D clocks */
+    __HAL_RCC_LTDC_CLK_ENABLE();
+    // __HAL_RCC_DMA2D_CLK_ENABLE();   /* TODO:DMA部分没有特殊处理。故开启与否似乎无影响 */
+    /* Enable GPIOs clock */
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    __HAL_RCC_GPIOI_CLK_ENABLE();   /* LCD_DISP_GPIO_CLK_ENABLE */
+    __HAL_RCC_GPIOJ_CLK_ENABLE();
+    __HAL_RCC_GPIOK_CLK_ENABLE();   /* LCD_BL_CTRL_GPIO_CLK_ENABLE */
+    /* BUG:重复的原因？只是便于阅读？ */
+    LCD_DISP_GPIO_CLK_ENABLE();
+    LCD_BL_CTRL_GPIO_CLK_ENABLE();
+
+    /*** LTDC Pins configuration ***/
+    /* GPIOE configuration */
+    gpio_init_structure.Pin       = GPIO_PIN_4;
+    gpio_init_structure.Mode      = GPIO_MODE_AF_PP;
+    gpio_init_structure.Pull      = GPIO_NOPULL;
+    gpio_init_structure.Speed     = GPIO_SPEED_FAST;
+    gpio_init_structure.Alternate = GPIO_AF14_LTDC;
+    HAL_GPIO_Init(GPIOE, &gpio_init_structure);
+
+    /* GPIOG configuration */
+    gpio_init_structure.Pin       = GPIO_PIN_12;
+    gpio_init_structure.Mode      = GPIO_MODE_AF_PP;
+    gpio_init_structure.Alternate = GPIO_AF9_LTDC;
+    HAL_GPIO_Init(GPIOG, &gpio_init_structure);
+
+    /* GPIOI LTDC alternate configuration */
+    gpio_init_structure.Pin       = GPIO_PIN_9 | GPIO_PIN_10 | \
+                                    GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
+    gpio_init_structure.Mode      = GPIO_MODE_AF_PP;
+    gpio_init_structure.Alternate = GPIO_AF14_LTDC;
+    HAL_GPIO_Init(GPIOI, &gpio_init_structure);
+
+    /* GPIOJ configuration */
+    gpio_init_structure.Pin       = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 | \
+                                    GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7 | \
+                                    GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10 | GPIO_PIN_11 | \
+                                    GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15;
+    gpio_init_structure.Mode      = GPIO_MODE_AF_PP;
+    gpio_init_structure.Alternate = GPIO_AF14_LTDC;
+    HAL_GPIO_Init(GPIOJ, &gpio_init_structure);
+    
+    /* GPIOK configuration */
+    gpio_init_structure.Pin       = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_4 | \
+                                    GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
+    gpio_init_structure.Mode      = GPIO_MODE_AF_PP;
+    gpio_init_structure.Alternate = GPIO_AF14_LTDC;
+    HAL_GPIO_Init(GPIOK, &gpio_init_structure);
+
+    /* BUG:再次重复 */
+    /* LCD_DISP GPIO configuration */
+    gpio_init_structure.Pin       = LCD_DISP_PIN;     /* LCD_DISP pin has to be manually controlled */
+    gpio_init_structure.Mode      = GPIO_MODE_OUTPUT_PP;
+    HAL_GPIO_Init(LCD_DISP_GPIO_PORT, &gpio_init_structure);
+
+    /* LCD_BL_CTRL GPIO configuration */
+    gpio_init_structure.Pin       = LCD_BL_CTRL_PIN;  /* LCD_BL_CTRL pin has to be manually controlled */
+    gpio_init_structure.Mode      = GPIO_MODE_OUTPUT_PP;
+    HAL_GPIO_Init(LCD_BL_CTRL_GPIO_PORT, &gpio_init_structure);
+}
+
+/**
+ * @brief Configure LTDC PLL.
+ */
+void LCD_ClockConfig(void) {
+        static RCC_PeriphCLKInitTypeDef  periph_clk_init_struct;
+
+        /* RK043FN48H LCD clock configuration */
+        /* PLLSAI_VCO Input = HSE_VALUE/PLL_M = 1 Mhz */
+        /* PLLSAI_VCO Output = PLLSAI_VCO Input * PLLSAIN = 192 Mhz */
+        /* PLLLCDCLK = PLLSAI_VCO Output/PLLSAIR = 192/5 = 38.4 Mhz */
+        /* LTDC clock frequency = PLLLCDCLK / LTDC_PLLSAI_DIVR_4 = 38.4/4 = 9.6Mhz */
+        periph_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
+        periph_clk_init_struct.PLLSAI.PLLSAIN = 192;
+        periph_clk_init_struct.PLLSAI.PLLSAIR = 5;
+        periph_clk_init_struct.PLLSAIDivR = RCC_PLLSAIDIVR_4;
+        HAL_RCCEx_PeriphCLKConfig(&periph_clk_init_struct);
+    }
+
+/**
+  * @brief  Initializes the LCD.
+  * @retval LCD state
+  */
+static uint8_t LCD_Init(void)
+{
+    /* Select the used LCD */
+
+    /*********************
+     *   LCD_Init Begin
+     *********************/
+    /* The RK043FN48H LCD 480x272 is selected */
+    /* Timing Configuration */
+    hLtdcHandler.Init.HorizontalSync = (LTDC_F746_ROKOTECH.horizontalSync - 1);
+    hLtdcHandler.Init.VerticalSync = (LTDC_F746_ROKOTECH.verticalSync - 1);
+    hLtdcHandler.Init.AccumulatedHBP = (LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch - 1);
+    hLtdcHandler.Init.AccumulatedVBP = (LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch - 1);
+    hLtdcHandler.Init.AccumulatedActiveH = (LTDC_F746_ROKOTECH.height + LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch - 1);
+    hLtdcHandler.Init.AccumulatedActiveW = (LTDC_F746_ROKOTECH.width + LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch - 1);
+    hLtdcHandler.Init.TotalHeigh = (LTDC_F746_ROKOTECH.height + LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch + LTDC_F746_ROKOTECH.verticalFrontPorch - 1);
+    hLtdcHandler.Init.TotalWidth = (LTDC_F746_ROKOTECH.width + LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch + LTDC_F746_ROKOTECH.horizontalFrontPorch - 1);
+
+    /* Configure LTDC PLL. */
+    LCD_ClockConfig();
+
+    /* Initialize the LCD pixel width and pixel height */
+    hLtdcHandler.LayerCfg->ImageWidth  = LTDC_F746_ROKOTECH.width;
+    hLtdcHandler.LayerCfg->ImageHeight = LTDC_F746_ROKOTECH.height;
+
+    /* Background value */
+    hLtdcHandler.Init.Backcolor.Blue = 0;
+    hLtdcHandler.Init.Backcolor.Green = 0;
+    hLtdcHandler.Init.Backcolor.Red = 0;
+
+    /* Polarity */
+    hLtdcHandler.Init.HSPolarity = LTDC_HSPOLARITY_AL;
+    hLtdcHandler.Init.VSPolarity = LTDC_VSPOLARITY_AL;
+    hLtdcHandler.Init.DEPolarity = LTDC_DEPOLARITY_AL;
+    hLtdcHandler.Init.PCPolarity = LTDC_PCPOLARITY_IPC;
+    hLtdcHandler.Instance = LTDC;
+
+    if(HAL_LTDC_GetState(&hLtdcHandler) == HAL_LTDC_STATE_RESET)
+    {
+        /* Initialize the LCD Msp: this __weak function can be rewritten by the application */
+        LCD_MspInit();
+    }
+    HAL_LTDC_Init(&hLtdcHandler);
+
+    /* Assert display enable LCD_DISP pin */
+    pinMode(PI12, OUTPUT);  digitalWrite(PI12, HIGH);
+
+    /* Assert backlight LCD_BL_CTRL pin */
+    pinMode(PK3, OUTPUT);   digitalWrite(PK3, HIGH);
+
+    /* TODO:SDRAM配置似乎没有体现 */
+#ifndef DEBUG
+    UB_SDRAM_Init();
+#else
+    Serial.print("SDRAM_Init: ");
+    Serial.println(UB_SDRAM_Init());
+#endif
+
+    HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，暂未明白差异 */
+
+    // FIXME: 这段来自tft.c的代码一旦放入疑似看门狗锁死
+    uint32_t i;
+    for(i = 0; i < (LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height) ; i++)
+    {
+        buffer[i] = 0;
+    }
+
+    return LCD_OK;
+}
+
+/*********************
+ * LCD_LayerRgb565Init
+ *********************/
+static void LCD_LayerRgb565Init(uint32_t FB_Address)
+{
+    LTDC_LayerCfgTypeDef  layer_cfg;
+
+    /* Layer Init */
+    layer_cfg.WindowX0 = 0;
+    layer_cfg.WindowX1 = LTDC_F746_ROKOTECH.width;
+    layer_cfg.WindowY0 = 0;
+    layer_cfg.WindowY1 = LTDC_F746_ROKOTECH.height;
+
+    // layer_cfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
+#if LV_COLOR_DEPTH == 16
+    layer_cfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
+#elif LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
+    layer_cfg.PixelFormat = LTDC_PIXEL_FORMAT_ARGB8888;
+#else
+#error Unsupported color depth (see tft.c)
+#endif
+    layer_cfg.FBStartAdress = FB_Address;
+    layer_cfg.Alpha = 255;
+    layer_cfg.Alpha0 = 0;
+    layer_cfg.Backcolor.Blue = 0;
+    layer_cfg.Backcolor.Green = 0;
+    layer_cfg.Backcolor.Red = 0;
+    layer_cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_PAxCA;
+    layer_cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_PAxCA;
+    layer_cfg.ImageWidth = LTDC_F746_ROKOTECH.width;
+    layer_cfg.ImageHeight = LTDC_F746_ROKOTECH.height;
+
+    HAL_LTDC_ConfigLayer(&hLtdcHandler, &layer_cfg, 0);
+}
+
+/* TODO:定义屏幕开关 */
+static void LCD_DisplayOn(void) {
+    /* Display On */
+    /* Assert LCD_DISP pin */
+    __HAL_LTDC_ENABLE(&hLtdcHandler);
+    pinMode(PI12, OUTPUT);  digitalWrite(PI12, HIGH);
+    /* Assert LCD_BL_CTRL pin */
+    pinMode(PK3, OUTPUT);   digitalWrite(PK3, HIGH);
+}
+
+
+/* TODO:to be checked */
 static void DMA_Config(void)
 {
     /*## -1- Enable DMA2 clock #################################################*/

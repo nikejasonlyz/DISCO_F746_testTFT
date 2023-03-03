@@ -15,37 +15,19 @@
 ************************************************************************/
 // #include "stm32f746xx.h" // Provide specific declarations for LTDC, TFT, etc
 #include <Arduino.h>
-#include <yjTask.hpp>
+#include <lv_conf.h>
 
-#include "LTDC_F746_Discovery.h" // TFT
+#include <yjTask.hpp>
+TaskLed tBlink1(LED_BUILTIN,350);     //设引脚LED,num为LED灯的闪烁周期
+
+#include "LTDC_TFT.h"                 // TFT
 #include "TouchScreen_F7_Discovery.h" // TOUCH
 
-TaskLed tBlink1(LED_BUILTIN,350);//设引脚LED,num为LED灯的闪烁周期
-
-/* inherented from Adafruit */
-LTDC_F746_Discovery tft;  /* TFT instance */
 TouchScreen         ts;   /* TouchScreen instance */
-
-
-#if LV_COLOR_DEPTH == 16
-typedef uint16_t uintpixel_t;
-#elif LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
-typedef uint32_t uintpixel_t;
-#endif
-uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
-// static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
-
-/* 参考作用 */
-/*Change to your screen resolution*/
-static const uint16_t LV_HOR_RES_MAX  = 480;
-static const uint16_t LV_VER_RES_MAX = 272;
 
 /* LVGL */
 #include <lvgl.h>
 #include <demos/lv_demos.h>
-static lv_disp_draw_buf_t draw_buf;   // Draw buffer of lv_demo
-static lv_color_t buf1_1[LV_HOR_RES_MAX * 68];
-static lv_color_t buf1_2[LV_HOR_RES_MAX * 68];
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -55,25 +37,6 @@ void pig_print(const char * buf)
     Serial.flush();
 }
 #endif
-
-/* Display flushing */
-void pig_disp_flush( lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p )
-{
-  /*The most simple case (but also the slowest) to put all pixels to the screen one-by-one*/
-  int32_t x;
-  int32_t y;
-  for(y = area->y1; y <= area->y2; y++) {
-      for(x = area->x1; x <= area->x2; x++) {
-          /*Put a pixel to the display. For example:*/
-          /*put_px(x, y, *color_p)*/
-          // tft.drawPixel(x, y, (uint16_t)(*color_p));
-          color_p++;
-      }
-  }
-  /*IMPORTANT!!!
-    *Inform the graphics library that you are ready with the flushing*/
-  lv_disp_flush_ready(disp);
-}
 
 /*Read the touchpad*/
 void touchpad_read( lv_indev_drv_t * indev_driver, lv_indev_data_t * data )
@@ -113,31 +76,8 @@ void setup()
 #if LV_USE_LOG != 0
   lv_log_register_print_cb( pig_print ); /* register print function for debugging */
 #endif
-
-  // The buffer is memory mapped
-  // You can directly draw on the display by writing to the buffer
   
-  tft.begin((uint16_t *)buffer);
-  // tft.setRotation( 3 ); /* Landscape orientation, flipped */
-  // tft.fillScreen(LTDC_BLACK);
-
-  /*Set the touchscreen calibration data,
-    the actual data for your display can be acquired using
-    the Generic -> Touch_calibrate example from the TFT_eSPI library*/
-  // uint16_t calData[5] = { 275, 3620, 264, 3532, 1 };
-  // tft.setTouch( calData );
-
-  lv_disp_draw_buf_init( &draw_buf, buf1_1, NULL, LV_HOR_RES_MAX * 68 );
-
-  /*Initialize the display*/
-  static lv_disp_drv_t disp_drv;
-  lv_disp_drv_init( &disp_drv );
-  /*Change the following line to your display resolution*/
-  disp_drv.hor_res = LV_HOR_RES_MAX;
-  disp_drv.ver_res = LV_VER_RES_MAX;
-  disp_drv.flush_cb = pig_disp_flush;
-  disp_drv.draw_buf = &draw_buf;
-  lv_disp_drv_register( &disp_drv );
+  tft_init();
 
   /*Initialize the (dummy) input device driver*/
   static lv_indev_drv_t indev_drv;
@@ -165,38 +105,37 @@ void setup()
   // lv_demo_printer();
   // lv_demo_stress();             // seems to be OK
 #endif
+
   Serial.println( "Setup done" );
 
-  // tft.setCursor(0, 0);
-  // tft.setTextColor(LTDC_BLUE);  tft.setTextSize(3);
-  // tft.println("STM32F746 Discovery Touch");
 }
 
 // #define CURSOR_SIZE 100
 // TSPoint OldPoint;
 
-String comdata="";
-void ReceiveSerialMessage() {
-  comdata="";
-  while (Serial.available() > 0 )
-  {
-    comdata+=char(Serial.read());
-    delay(2);
-  }
-}
+// String comdata="";
+// void ReceiveSerialMessage() {
+//   comdata="";
+//   while (Serial.available() > 0 )
+//   {
+//     comdata+=char(Serial.read());
+//     delay(2);
+//   }
+// }
+
 void loop()
 {
-  ReceiveSerialMessage();
-  if (comdata.length() > 0) {
-    Serial.println(comdata);
-    if (comdata.compareTo("on")>0) {
-      Serial.println("LCD on!");
-      tft.LCD_DisplayOn();
-    } else if (comdata.compareTo("off")>0) {
-      Serial.println("LCD off!");
-      tft.LCD_DisplayOff();
-    }
-  }
+  // ReceiveSerialMessage();
+  // if (comdata.length() > 0) {
+  //   Serial.println(comdata);
+  //   if (comdata.compareTo("on")>0) {
+  //     Serial.println("LCD on!");
+  //     tft.LCD_DisplayOn();
+  //   } else if (comdata.compareTo("off")>0) {
+  //     Serial.println("LCD off!");
+  //     tft.LCD_DisplayOff();
+  //   }
+  // }
   // TSPoint p = ts.getPoint();
 
   // if( OldPoint != p )
