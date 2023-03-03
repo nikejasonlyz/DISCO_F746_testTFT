@@ -3,6 +3,7 @@
 
 #include <Adafruit_SPITFT.h>   // GFX lib for SPI and parallel displays
 #include <Adafruit_STMPE610.h> // SPI Touchscreen lib
+// #include "D:\My_Project\PlatformIO\Arduino\DISCO_F746_testTFT\.pio\libdeps\disco_f746ng\Adafruit STMPE610\Adafruit_STMPE610.h"
 #include <TouchScreen.h>       // ADC touchscreen lib
 #include <lvgl.h>              // LittlevGL core lib
 #if defined(ARDUINO_ARCH_SAMD)

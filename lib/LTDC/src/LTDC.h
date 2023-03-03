@@ -80,6 +80,7 @@ class LTDCClass : public Adafruit_GFX {
 
         void begin(uint16_t *buffer);
 
+        /* TODO: setAddrWindow() */
         void drawPixel(int16_t x, int16_t y, uint16_t color);
 
         void startWrite(void);
