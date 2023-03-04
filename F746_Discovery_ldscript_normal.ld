@@ -1,3 +1,13 @@
+/*
+ * @Author: nikejasonlyz
+ * @Date: 2023-03-04 01:01:46
+ * @LastEditors: nikejasonlyz
+ * @LastEditTime: 2023-03-04 13:35:41
+ * @FilePath: \DISCO_F746_testTFT\STM32F746_Discovery_ldscript.ld
+ * @Description: Linker Script，增改SDRAM等必要信息
+ * 
+ * Copyright (c) 2023 by nikejasonlyz, All Rights Reserved. 
+ */
 /**
  ******************************************************************************
  * @file      LinkerScript.ld
@@ -29,15 +39,18 @@ ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
 _estack = ORIGIN(RAM) + LENGTH(RAM);	/* end of "RAM" Ram type memory */
-
-_Min_Heap_Size = 0x200 ;	/* required amount of heap  */
-_Min_Stack_Size = 0x400 ;	/* required amount of stack */
+/* Generate a link error if heap and stack don't fit into RAM */
+_Min_Heap_Size = 0x800 ;	/* required amount of heap  */
+_Min_Stack_Size = 0x1000 ;	/* required amount of stack */
 
 /* Memories definition */
 MEMORY
 {
-  RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = LD_MAX_DATA_SIZE
-  FLASH    (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
+  RAM    (xrw)    : ORIGIN = 0x20000000,  LENGTH = LD_MAX_DATA_SIZE
+  /* FLASH   (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET */
+  FLASH (rx)      : ORIGIN = 0x8000000,   LENGTH = 1024K
+  /* 设置sdram, 8MB */
+  /* SDRAM  (rwx)    : ORIGIN = 0xC0000000,  LENGTH = 8M */
 }
 
 /* Sections */

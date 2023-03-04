@@ -27,7 +27,8 @@ TouchScreen         ts;   /* TouchScreen instance */
 
 /* LVGL */
 #include <lvgl.h>
-#include <demos/lv_demos.h>
+// #include <demos/lv_demos.h>
+#include <ui.h>
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -86,6 +87,8 @@ void setup()
   indev_drv.read_cb = touchpad_read;
   lv_indev_drv_register( &indev_drv );
 
+  ui_init();
+
 #if 0
   /* Create simple label */
   lv_obj_t *label = lv_label_create( lv_scr_act() );
@@ -105,7 +108,6 @@ void setup()
   // lv_demo_printer();
   // lv_demo_stress();             // seems to be OK
 #endif
-
   Serial.println( "Setup done" );
 
 }
@@ -113,29 +115,29 @@ void setup()
 // #define CURSOR_SIZE 100
 // TSPoint OldPoint;
 
-// String comdata="";
-// void ReceiveSerialMessage() {
-//   comdata="";
-//   while (Serial.available() > 0 )
-//   {
-//     comdata+=char(Serial.read());
-//     delay(2);
-//   }
-// }
+String comdata="";
+void ReceiveSerialMessage() {
+  comdata="";
+  while (Serial.available() > 0 )
+  {
+    comdata+=char(Serial.read());
+    delay(2);
+  }
+}
 
 void loop()
 {
-  // ReceiveSerialMessage();
-  // if (comdata.length() > 0) {
-  //   Serial.println(comdata);
-  //   if (comdata.compareTo("on")>0) {
-  //     Serial.println("LCD on!");
-  //     tft.LCD_DisplayOn();
-  //   } else if (comdata.compareTo("off")>0) {
-  //     Serial.println("LCD off!");
-  //     tft.LCD_DisplayOff();
-  //   }
-  // }
+  ReceiveSerialMessage();
+  if (comdata.length() > 0) {
+    Serial.println(comdata);
+    if (comdata.compareTo("on")>0) {
+      Serial.println("LCD on!");
+      LCD_DisplayOn();
+    } else if (comdata.compareTo("off")>0) {
+      Serial.println("LCD off!");
+      LCD_DisplayOff();
+    }
+  }
   // TSPoint p = ts.getPoint();
 
   // if( OldPoint != p )

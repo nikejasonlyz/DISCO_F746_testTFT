@@ -2,7 +2,7 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-03 01:51:38
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-04 12:18:54
+ * @LastEditTime: 2023-03-04 18:43:00
  * @FilePath: \DISCO_F746_testTFT\lib\LTDC\src\LTDC_TFT.cpp
  * @Description: Interfaces for LVGL support
  * @
@@ -13,12 +13,13 @@
  *      INCLUDES
  *********************/
 #include "Arduino.h"
-#include "LTDC_TFT.h"
-#include "stm32_ub_sdram.h"
 #include "lv_conf.h"
 #include "lvgl.h"
+#include "LTDC_TFT.h"
+#include "f746_sdram.h"
+#include "rk043fn48h/rk043fn48h.h"
 
-#include "USER_DEBUG_MACROS.h"
+#include "../../include/USER_DEBUG_MACROS.h"
 
 /*********************
  *      DEFINES
@@ -78,28 +79,28 @@
 /**********************
  *      TYPEDEFS
  **********************/
-struct LTDCSettings {
-    uint16_t width;
-    uint16_t height;
-    uint16_t horizontalSync;
-    uint16_t horizontalFrontPorch;
-    uint16_t horizontalBackPorch;
-    uint16_t verticalSync;
-    uint16_t verticalFrontPorch;
-    uint16_t verticalBackPorch;
-};
+// struct LTDCSettings {
+//     uint16_t width;
+//     uint16_t height;
+//     uint16_t horizontalSync;
+//     uint16_t horizontalFrontPorch;
+//     uint16_t horizontalBackPorch;
+//     uint16_t verticalSync;
+//     uint16_t verticalFrontPorch;
+//     uint16_t verticalBackPorch;
+// };
 
 // The display on STM32F746NG Discovery
-constexpr LTDCSettings LTDC_F746_ROKOTECH = {
-    .width = 480,
-    .height = 272,
-    .horizontalSync = 41,
-    .horizontalFrontPorch = 32,
-    .horizontalBackPorch = 13,
-    .verticalSync = 10,
-    .verticalFrontPorch = 2,
-    .verticalBackPorch = 10,
-};
+// constexpr LTDCSettings LTDC_F746_ROKOTECH = {
+//     .width = 480,
+//     .height = 272,
+//     .horizontalSync = 41,
+//     .horizontalFrontPorch = 32,
+//     .horizontalBackPorch = 13,
+//     .verticalSync = 10,
+//     .verticalFrontPorch = 2,
+//     .verticalBackPorch = 10,
+// };
 
 /**********************
  *  STATIC PROTOTYPES
@@ -111,7 +112,8 @@ static void ex_disp_clean_dcache(lv_disp_drv_t *drv);
 
 static uint8_t LCD_Init(void);
 static void LCD_LayerRgb565Init(uint32_t FB_Address);
-static void LCD_DisplayOn(void);
+void LCD_DisplayOn(void);
+void LCD_DisplayOff(void);
 
 static void DMA_Config(void);
 static void DMA_TransferComplete(DMA_HandleTypeDef *han);
@@ -131,12 +133,12 @@ typedef uint32_t uintpixel_t;
 
 /* You can try to change buffer to internal ram by uncommenting line below and commenting
  * SDRAM one. */
-//static uintpixel_t buffer[TFT_HOR_RES * TFT_VER_RES];
+// static uintpixel_t my_fb[LV_HOR_RES_MAX * LV_VER_RES_MAX];
 
-static __IO uintpixel_t * buffer = (__IO uintpixel_t*) (0x60000000);
+static __IO uintpixel_t * my_fb = (__IO uintpixel_t*) (0x60000000);
 
 /* old one by malloc() */
-// static uint16_t *buffer = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
+// static uint16_t *my_fb = (uint16_t *)malloc(LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height * sizeof(uint16_t));
 
 static DMA_HandleTypeDef  DmaHandle;
 static int32_t            x1_flush;
@@ -157,21 +159,22 @@ static lv_disp_t *our_disp = NULL;
  */
 void tft_init(void)
 {
+DBG_PRINT("\t[Func tft_init]\n\n")
 	/* There is only one display on STM32 */
 	if(our_disp != NULL)
 		abort();
     /* LCD Initialization */
     LCD_Init();
-    LCD_LayerRgb565Init((uint32_t)buffer);
+    LCD_LayerRgb565Init((uint32_t)my_fb);
 
     /* Enable the LCD */
     LCD_DisplayOn();
 
-    Serial.println("LCD_TFT: LCD initialized");
+DBG_PRINTLN("LCD_TFT: LCD initialized")
 
     DMA_Config();
 
-    Serial.println("DMA_Config");
+DBG_PRINTLN("DMA_Config Finished")
 
     /*-----------------------------
 	*  Create a buffer for drawing
@@ -183,29 +186,38 @@ void tft_init(void)
 	static lv_color_t buf1_2[LV_HOR_RES_MAX * 68];
 	lv_disp_draw_buf_init(&disp_buf_1, buf1_1, buf1_2, LV_HOR_RES_MAX * 68);   /*Initialize the display buffer*/
 
+DBG_PRINTLN("lv_disp_draw_buf_init finished")
 
 	/*-----------------------------------
 	* Register the display in LittlevGL
 	*----------------------------------*/
 
 	lv_disp_drv_init(&disp_drv);                    /*Basic initialization*/
+DBG_PRINTLN("lv_disp_drv_init finished\n")
 
 	/*Set up the functions to access to your display*/
 
 	/*Set the resolution of the display*/
-	disp_drv.hor_res = LTDC_F746_ROKOTECH.width;
-	disp_drv.ver_res = LTDC_F746_ROKOTECH.height;
+	disp_drv.hor_res = 480;
+	disp_drv.ver_res = 272;
 
 	/*Used to copy the buffer's content to the display*/
+
 	disp_drv.flush_cb = ex_disp_flush;
+DBG_PRINTLN("disp_drv.flush_cb = ex_disp_flush")
 	disp_drv.clean_dcache_cb = ex_disp_clean_dcache;
+DBG_PRINTLN("disp_drv.clean_dcache_cb = ex_disp_clean_dcache")
+DBG_PRINTLN("To copy the buffer's content to the display")
 
 	/*Set a display buffer*/
 	disp_drv.draw_buf = &disp_buf_1;
-
+DBG_PRINTLN("Set a display buffer: Finished")
 
 	/*Finally register the driver*/
 	our_disp = lv_disp_drv_register(&disp_drv);
+DBG_PRINTLN("Register the driver: Finished")    
+
+DBG_PRINTLN("\t[Func tft_init end]\n\n")
 }
 
 /**********************
@@ -242,8 +254,10 @@ static void ex_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
     y_fill_act = act_y1;
     buf_to_flush = color_p;
 
+DBG_PRINT("[in Func ex_disp_flush]\nSCB_CleanInvalidateDCache, SCB_InvalidateICache: ")
 	SCB_CleanInvalidateDCache();
 	SCB_InvalidateICache();
+DBG_PRINTLN("OK!")
     /*##-7- Start the DMA transfer using the interrupt mode #*/
     /* Configure the source, destination and buffer size DMA fields and Start DMA Stream transfer */
     /* Enable All the DMA interrupts */
@@ -254,21 +268,25 @@ static void ex_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
 #endif
 
 #ifdef DEBUG
-    DBG_PRINT("HAL_DMA_Start_IT: ");
-    DBG_PRINTLN(HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * LV_HOR_RES_MAX + x1_flush], length));
+DBG_PRINT("[in Func ex_disp_flush]\nHAL_DMA_Start_IT: ")
+DBG_PRINTLN(HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&my_fb[y_fill_act * LV_HOR_RES_MAX + x1_flush], length))
 #else
-    err = HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * LV_HOR_RES_MAX + x1_flush],
+    err = HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&my_fb[y_fill_act * LV_HOR_RES_MAX + x1_flush],
              length);
     if(err != HAL_OK)
     {
         while(1);	/*Halt on error*/
     }
 #endif
+
+    // lv_disp_flush_ready(&disp_drv);
 }
 
 static void ex_disp_clean_dcache(lv_disp_drv_t *drv)
 {
+DBG_PRINT("[in Func ex_disp_clean_dcache]\nSCB_CleanInvalidateDCache: ")
     SCB_CleanInvalidateDCache();
+DBG_PRINTLN("OK!")
 }
 
 /**
@@ -279,7 +297,7 @@ static void LCD_MspInit(void) {
 
     /* Enable the LTDC and DMA2D clocks */
     __HAL_RCC_LTDC_CLK_ENABLE();
-    // __HAL_RCC_DMA2D_CLK_ENABLE();   /* TODO:DMA部分没有特殊处理。故开启与否似乎无影响 */
+    __HAL_RCC_DMA2D_CLK_ENABLE();   /* TODO:DMA部分没有特殊处理。故开启与否似乎无影响 */
     /* Enable GPIOs clock */
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -343,7 +361,7 @@ static void LCD_MspInit(void) {
 /**
  * @brief Configure LTDC PLL.
  */
-void LCD_ClockConfig(void) {
+static void LCD_ClockConfig(void) {
         static RCC_PeriphCLKInitTypeDef  periph_clk_init_struct;
 
         /* RK043FN48H LCD clock configuration */
@@ -353,7 +371,7 @@ void LCD_ClockConfig(void) {
         /* LTDC clock frequency = PLLLCDCLK / LTDC_PLLSAI_DIVR_4 = 38.4/4 = 9.6Mhz */
         periph_clk_init_struct.PeriphClockSelection = RCC_PERIPHCLK_LTDC;
         periph_clk_init_struct.PLLSAI.PLLSAIN = 192;
-        periph_clk_init_struct.PLLSAI.PLLSAIR = 5;
+        periph_clk_init_struct.PLLSAI.PLLSAIR = RK043FN48H_FREQUENCY_DIVIDER;
         periph_clk_init_struct.PLLSAIDivR = RCC_PLLSAIDIVR_4;
         HAL_RCCEx_PeriphCLKConfig(&periph_clk_init_struct);
     }
@@ -371,21 +389,21 @@ static uint8_t LCD_Init(void)
      *********************/
     /* The RK043FN48H LCD 480x272 is selected */
     /* Timing Configuration */
-    hLtdcHandler.Init.HorizontalSync = (LTDC_F746_ROKOTECH.horizontalSync - 1);
-    hLtdcHandler.Init.VerticalSync = (LTDC_F746_ROKOTECH.verticalSync - 1);
-    hLtdcHandler.Init.AccumulatedHBP = (LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch - 1);
-    hLtdcHandler.Init.AccumulatedVBP = (LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch - 1);
-    hLtdcHandler.Init.AccumulatedActiveH = (LTDC_F746_ROKOTECH.height + LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch - 1);
-    hLtdcHandler.Init.AccumulatedActiveW = (LTDC_F746_ROKOTECH.width + LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch - 1);
-    hLtdcHandler.Init.TotalHeigh = (LTDC_F746_ROKOTECH.height + LTDC_F746_ROKOTECH.verticalSync + LTDC_F746_ROKOTECH.verticalBackPorch + LTDC_F746_ROKOTECH.verticalFrontPorch - 1);
-    hLtdcHandler.Init.TotalWidth = (LTDC_F746_ROKOTECH.width + LTDC_F746_ROKOTECH.horizontalSync + LTDC_F746_ROKOTECH.horizontalBackPorch + LTDC_F746_ROKOTECH.horizontalFrontPorch - 1);
+    hLtdcHandler.Init.HorizontalSync = (RK043FN48H_HSYNC - 1);
+    hLtdcHandler.Init.VerticalSync = (RK043FN48H_VSYNC - 1);
+    hLtdcHandler.Init.AccumulatedHBP = (RK043FN48H_HSYNC + RK043FN48H_HBP - 1);
+    hLtdcHandler.Init.AccumulatedVBP = (RK043FN48H_VSYNC + RK043FN48H_VBP - 1);
+    hLtdcHandler.Init.AccumulatedActiveH = (RK043FN48H_HEIGHT + RK043FN48H_VSYNC + RK043FN48H_VBP - 1);
+    hLtdcHandler.Init.AccumulatedActiveW = (RK043FN48H_WIDTH + RK043FN48H_HSYNC + RK043FN48H_HBP - 1);
+    hLtdcHandler.Init.TotalHeigh = (RK043FN48H_HEIGHT + RK043FN48H_VSYNC + RK043FN48H_VBP + RK043FN48H_VFP - 1);
+    hLtdcHandler.Init.TotalWidth = (RK043FN48H_WIDTH + RK043FN48H_HSYNC + RK043FN48H_HBP + RK043FN48H_HFP - 1);
 
     /* Configure LTDC PLL. */
     LCD_ClockConfig();
 
     /* Initialize the LCD pixel width and pixel height */
-    hLtdcHandler.LayerCfg->ImageWidth  = LTDC_F746_ROKOTECH.width;
-    hLtdcHandler.LayerCfg->ImageHeight = LTDC_F746_ROKOTECH.height;
+    hLtdcHandler.LayerCfg->ImageWidth  = RK043FN48H_WIDTH;
+    hLtdcHandler.LayerCfg->ImageHeight = RK043FN48H_HEIGHT;
 
     /* Background value */
     hLtdcHandler.Init.Backcolor.Blue = 0;
@@ -407,27 +425,29 @@ static uint8_t LCD_Init(void)
     HAL_LTDC_Init(&hLtdcHandler);
 
     /* Assert display enable LCD_DISP pin */
-    pinMode(PI12, OUTPUT);  digitalWrite(PI12, HIGH);
+    // pinMode(PI12, OUTPUT);
+    digitalWrite(PI12, HIGH);
 
     /* Assert backlight LCD_BL_CTRL pin */
-    pinMode(PK3, OUTPUT);   digitalWrite(PK3, HIGH);
+    // pinMode(PK3, OUTPUT);
+    digitalWrite(PK3, HIGH);
 
     /* TODO:SDRAM配置似乎没有体现 */
-#ifndef DEBUG
-    UB_SDRAM_Init();
+#if 1
+    BSP_SDRAM_Init();
 #else
-    DBG_PRINT("SDRAM_Init: ");
-    DBG_PRINTLN(UB_SDRAM_Init());
+DBG_PRINT("[in Func LCD_Init]\nSDRAM_Init: ")
+DBG_PRINTLN(BSP_SDRAM_Init())
 #endif
 
     HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，暂未明白差异 */
 
-    // FIXME: 这段来自tft.c的代码一旦放入疑似看门狗锁死
-    // uint32_t i;
-    // for(i = 0; i < (LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height) ; i++)
-    // {
-    //     buffer[i] = 0;
-    // }
+    // FIXME: 这段来自tft.c的代码一旦放入疑似锁死
+    uint32_t i;
+    for(i = 0; i < (LV_HOR_RES_MAX * LV_VER_RES_MAX) ; i++)
+    {
+        my_fb[i] = 0;
+    }
 
     return LCD_OK;
 }
@@ -441,9 +461,9 @@ static void LCD_LayerRgb565Init(uint32_t FB_Address)
 
     /* Layer Init */
     layer_cfg.WindowX0 = 0;
-    layer_cfg.WindowX1 = LTDC_F746_ROKOTECH.width;
+    layer_cfg.WindowX1 = LV_HOR_RES_MAX;
     layer_cfg.WindowY0 = 0;
-    layer_cfg.WindowY1 = LTDC_F746_ROKOTECH.height;
+    layer_cfg.WindowY1 = LV_VER_RES_MAX;
 
     // layer_cfg.PixelFormat = LTDC_PIXEL_FORMAT_RGB565;
 #if LV_COLOR_DEPTH == 16
@@ -461,14 +481,14 @@ static void LCD_LayerRgb565Init(uint32_t FB_Address)
     layer_cfg.Backcolor.Red = 0;
     layer_cfg.BlendingFactor1 = LTDC_BLENDING_FACTOR1_PAxCA;
     layer_cfg.BlendingFactor2 = LTDC_BLENDING_FACTOR2_PAxCA;
-    layer_cfg.ImageWidth = LTDC_F746_ROKOTECH.width;
-    layer_cfg.ImageHeight = LTDC_F746_ROKOTECH.height;
+    layer_cfg.ImageWidth = LV_HOR_RES_MAX;
+    layer_cfg.ImageHeight = LV_VER_RES_MAX;
 
     HAL_LTDC_ConfigLayer(&hLtdcHandler, &layer_cfg, 0);
 }
 
 /* TODO:定义屏幕开关 */
-static void LCD_DisplayOn(void) {
+void LCD_DisplayOn(void) {
     /* Display On */
     /* Assert LCD_DISP pin */
     __HAL_LTDC_ENABLE(&hLtdcHandler);
@@ -476,7 +496,14 @@ static void LCD_DisplayOn(void) {
     /* Assert LCD_BL_CTRL pin */
     pinMode(PK3, OUTPUT);   digitalWrite(PK3, HIGH);
 }
-
+void LCD_DisplayOff(void) {
+    /* Display On */
+    /* Assert LCD_DISP pin */
+    __HAL_LTDC_ENABLE(&hLtdcHandler);
+    pinMode(PI12, OUTPUT);  digitalWrite(PI12, LOW);
+    /* Assert LCD_BL_CTRL pin */
+    pinMode(PK3, OUTPUT);   digitalWrite(PK3, HIGH);
+}
 
 /* TODO:to be checked */
 static void DMA_Config(void)
@@ -503,8 +530,8 @@ static void DMA_Config(void)
 
     /*##-4- Initialize the DMA stream ##########################################*/
 #ifdef DEBUG
-    DBG_PRINT("HAL_DMA_Init: ");
-    DBG_PRINTLN(HAL_DMA_Init(&DmaHandle));
+DBG_PRINT("[in Func DMA_Config]\nHAL_DMA_Init: ")
+DBG_PRINTLN(HAL_DMA_Init(&DmaHandle))
 #else
     if(HAL_DMA_Init(&DmaHandle) != HAL_OK)
     {
@@ -514,10 +541,15 @@ static void DMA_Config(void)
     }
 #endif
 
+#ifndef DEBUG
     /*##-5- Select Callbacks functions called after Transfer complete and Transfer error */
     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_CPLT_CB_ID, DMA_TransferComplete);
     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_ERROR_CB_ID, DMA_TransferError);
-
+#else
+DBG_PRINTLN("[in Func DMA_Config]\nSelect Callbacks functions called\n after Transfer complete and Transfer error")
+DBG_PRINTLN(HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_CPLT_CB_ID, DMA_TransferComplete))
+DBG_PRINTLN(HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_ERROR_CB_ID, DMA_TransferError))
+#endif
     /*##-6- Configure NVIC for DMA transfer complete/error interrupts ##########*/
     HAL_NVIC_SetPriority(CPY_BUF_DMA_STREAM_IRQ, 0, 0);
     HAL_NVIC_EnableIRQ(CPY_BUF_DMA_STREAM_IRQ);
@@ -548,11 +580,10 @@ static void DMA_TransferComplete(DMA_HandleTypeDef *han)
 #endif
 
 #ifdef DEBUG
-        DBG_PRINT("HAL_DMA_Start_IT: ");
-        DBG_PRINTLN(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * 480 + x1_flush],
-                            length));
+DBG_PRINT("HAL_DMA_Start_IT: ")
+DBG_PRINTLN(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&my_fb[y_fill_act * 480 + x1_flush], length))
 #else
-        if(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * 480 + x1_flush],
+        if(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&my_fb[y_fill_act * 480 + x1_flush],
                             length) != HAL_OK)
         {
             while(1);	/*Halt on error*/
