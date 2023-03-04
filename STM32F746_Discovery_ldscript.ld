@@ -2,7 +2,7 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-04 01:01:46
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-04 01:37:33
+ * @LastEditTime: 2023-03-04 11:57:42
  * @FilePath: \DISCO_F746_testTFT\STM32F746_Discovery_ldscript.ld
  * @Description: Linker Script，增改SDRAM等必要信息
  * 

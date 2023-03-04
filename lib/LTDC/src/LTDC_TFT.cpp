@@ -2,7 +2,7 @@
  * @Author: nikejasonlyz
  * @Date: 2023-03-03 01:51:38
  * @LastEditors: nikejasonlyz
- * @LastEditTime: 2023-03-04 06:00:47
+ * @LastEditTime: 2023-03-04 12:18:54
  * @FilePath: \DISCO_F746_testTFT\lib\LTDC\src\LTDC_TFT.cpp
  * @Description: Interfaces for LVGL support
  * @
@@ -17,6 +17,8 @@
 #include "stm32_ub_sdram.h"
 #include "lv_conf.h"
 #include "lvgl.h"
+
+#include "USER_DEBUG_MACROS.h"
 
 /*********************
  *      DEFINES
@@ -165,7 +167,11 @@ void tft_init(void)
     /* Enable the LCD */
     LCD_DisplayOn();
 
+    Serial.println("LCD_TFT: LCD initialized");
+
     DMA_Config();
+
+    Serial.println("DMA_Config");
 
     /*-----------------------------
 	*  Create a buffer for drawing
@@ -246,12 +252,18 @@ static void ex_disp_flush(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
 #if LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
     length *= 2; /* STM32 DMA uses 16-bit chunks so multiply by 2 for 32-bit color */
 #endif
+
+#ifdef DEBUG
+    DBG_PRINT("HAL_DMA_Start_IT: ");
+    DBG_PRINTLN(HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * LV_HOR_RES_MAX + x1_flush], length));
+#else
     err = HAL_DMA_Start_IT(&DmaHandle,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * LV_HOR_RES_MAX + x1_flush],
              length);
     if(err != HAL_OK)
     {
         while(1);	/*Halt on error*/
     }
+#endif
 }
 
 static void ex_disp_clean_dcache(lv_disp_drv_t *drv)
@@ -404,18 +416,18 @@ static uint8_t LCD_Init(void)
 #ifndef DEBUG
     UB_SDRAM_Init();
 #else
-    Serial.print("SDRAM_Init: ");
-    Serial.println(UB_SDRAM_Init());
+    DBG_PRINT("SDRAM_Init: ");
+    DBG_PRINTLN(UB_SDRAM_Init());
 #endif
 
     HAL_EnableFMCMemorySwapping(); /* 启用FMC内存映射交换，暂未明白差异 */
 
     // FIXME: 这段来自tft.c的代码一旦放入疑似看门狗锁死
-    uint32_t i;
-    for(i = 0; i < (LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height) ; i++)
-    {
-        buffer[i] = 0;
-    }
+    // uint32_t i;
+    // for(i = 0; i < (LTDC_F746_ROKOTECH.width * LTDC_F746_ROKOTECH.height) ; i++)
+    // {
+    //     buffer[i] = 0;
+    // }
 
     return LCD_OK;
 }
@@ -490,12 +502,17 @@ static void DMA_Config(void)
     DmaHandle.Instance = CPY_BUF_DMA_STREAM;
 
     /*##-4- Initialize the DMA stream ##########################################*/
+#ifdef DEBUG
+    DBG_PRINT("HAL_DMA_Init: ");
+    DBG_PRINTLN(HAL_DMA_Init(&DmaHandle));
+#else
     if(HAL_DMA_Init(&DmaHandle) != HAL_OK)
     {
         while(1)
         {
         }
     }
+#endif
 
     /*##-5- Select Callbacks functions called after Transfer complete and Transfer error */
     HAL_DMA_RegisterCallback(&DmaHandle, HAL_DMA_XFER_CPLT_CB_ID, DMA_TransferComplete);
@@ -529,11 +546,18 @@ static void DMA_TransferComplete(DMA_HandleTypeDef *han)
 #if LV_COLOR_DEPTH == 24 || LV_COLOR_DEPTH == 32
         length *= 2; /* STM32 DMA uses 16-bit chunks so multiply by 2 for 32-bit color */
 #endif
+
+#ifdef DEBUG
+        DBG_PRINT("HAL_DMA_Start_IT: ");
+        DBG_PRINTLN(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * 480 + x1_flush],
+                            length));
+#else
         if(HAL_DMA_Start_IT(han,(uint32_t)buf_to_flush, (uint32_t)&buffer[y_fill_act * 480 + x1_flush],
                             length) != HAL_OK)
         {
             while(1);	/*Halt on error*/
         }
+#endif
     }
 }
 

@@ -86,7 +86,7 @@ void setup()
   indev_drv.read_cb = touchpad_read;
   lv_indev_drv_register( &indev_drv );
 
-#if 1
+#if 0
   /* Create simple label */
   lv_obj_t *label = lv_label_create( lv_scr_act() );
   lv_label_set_text( label, LVGL_Arduino.c_str() );
@@ -98,7 +98,7 @@ void setup()
   */
 
   // uncomment one of these demos
-  lv_demo_widgets();            // OK
+  // lv_demo_widgets();            // OK
   // lv_demo_benchmark();          // OK
   // lv_demo_keypad_encoder();     // works, but I haven't an encoder
   // lv_demo_music();              // NOK
